@@ -1,186 +1,191 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { getJobById, applyToJob } from '@/lib/api-client'
-import { useAuth } from '@/lib/auth-context'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+import { Toaster } from '@/components/ui/toaster'
+import { ArrowLeft } from 'lucide-react'
+import { ApplyButton } from '@/components/apply-button'
+import { JobHeader } from '@/components/job-header'
+import { TechStack } from '@/components/tech-stack'
 
-interface Job {
+interface JobDetails {
   id: string
   title: string
   company: string
-  description: string
-  tech_stack: string[]
+  applicationCount: number
   deadline: string
-  applicationCount?: number
+  technologies: string[]
+  description: string
 }
 
-export default function JobDetailPage() {
-  const params = useParams()
-  const router = useRouter()
-  const { user, isAuthenticated } = useAuth()
-
-  const jobId = params.id as string
-  const [job, setJob] = useState<Job | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [applying, setApplying] = useState(false)
-  const [applied, setApplied] = useState(false)
+// Mock auth - replace with real auth check
+function useAuth() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [userRole, setUserRole] = useState<'Talent' | 'Employer' | null>(null)
 
   useEffect(() => {
-    const loadJob = async () => {
+    // In production, verify auth token from localStorage or cookies
+    const mockAuth = localStorage.getItem('mockAuth')
+    if (mockAuth) {
+      const auth = JSON.parse(mockAuth)
+      setIsLoggedIn(true)
+      setUserRole(auth.role)
+    }
+  }, [])
+
+  return { isLoggedIn, userRole }
+}
+
+export default function JobDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
+  const [job, setJob] = useState<JobDetails | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [id, setId] = useState<string | null>(null)
+  const { isLoggedIn, userRole } = useAuth()
+
+  useEffect(() => {
+    params.then((resolvedParams) => {
+      setId(resolvedParams.id)
+    })
+  }, [params])
+
+  useEffect(() => {
+    if (!id) return
+
+    const fetchJobDetails = async () => {
       try {
-        const data = await getJobById(jobId)
+        setError(null)
+        const response = await fetch(`/api/jobs/${id}`)
+
+        if (!response.ok) {
+          throw new Error('Job not found')
+        }
+
+        const data = await response.json()
         setJob(data)
       } catch (err) {
-        setError('Failed to load job details')
-        console.error(err)
+        console.error('[v0] Fetch job error:', err)
+        setError(err instanceof Error ? err.message : 'Failed to load job')
       } finally {
-        setLoading(false)
+        setIsLoading(false)
       }
     }
 
-    loadJob()
-  }, [jobId])
+    fetchJobDetails()
+  }, [id])
 
-  const isDeadlinePassed = job ? new Date(job.deadline) < new Date() : false
-
-  const handleApply = async () => {
-    if (!isAuthenticated) {
-      // Redirect to login with return URL
-      router.push(`/login?redirect=/jobs/${jobId}`)
-      return
-    }
-
-    setApplying(true)
-    try {
-      await applyToJob(jobId)
-      setApplied(true)
-    } catch (err) {
-      setError('Failed to apply to job')
-      console.error(err)
-    } finally {
-      setApplying(false)
-    }
-  }
-
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <p className="text-muted-foreground">Loading job details...</p>
-      </div>
-    )
-  }
-
-  if (!job) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background">
-        <p className="text-muted-foreground">Job not found</p>
-        <Link href="/">
-          <Button variant="outline">Back to Jobs</Button>
-        </Link>
-      </div>
-    )
-  }
-
-  return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border bg-card">
-        <div className="mx-auto max-w-4xl px-4 py-6">
-          <Link href="/" className="mb-4 inline-block text-primary underline">
-            ← Back to Jobs
-          </Link>
-          <h1 className="text-3xl font-bold text-foreground">{job.title}</h1>
-          <p className="mt-2 text-muted-foreground">{job.company}</p>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="mx-auto max-w-4xl px-4 py-8">
-        {error && (
-          <div className="mb-6 rounded-lg border border-destructive bg-destructive/10 p-4 text-destructive">
-            {error}
-          </div>
-        )}
-
-        <div className="grid gap-8 md:grid-cols-3">
-          {/* Job Details */}
-          <div className="md:col-span-2 space-y-6">
-            <Card className="p-6">
-              <h2 className="mb-4 text-xl font-bold text-foreground">
-                About this role
-              </h2>
-              <p className="whitespace-pre-wrap text-foreground">
-                {job.description}
-              </p>
-            </Card>
-
-            <Card className="p-6">
-              <h3 className="mb-4 text-lg font-bold text-foreground">
-                Required Skills
-              </h3>
-              <div className="flex flex-wrap gap-2">
-                {job.tech_stack.map((tech) => (
-                  <Badge key={tech} variant="secondary">
-                    {tech}
-                  </Badge>
-                ))}
-              </div>
-            </Card>
-          </div>
-
-          {/* Sidebar */}
-          <div className="space-y-4">
-            <Card className="p-6">
-              <div className="mb-4 space-y-2">
-                <div>
-                  <p className="text-sm text-muted-foreground">Applications</p>
-                  <p className="text-2xl font-bold text-foreground">
-                    {job.applicationCount || 0}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Deadline</p>
-                  <p className="font-medium text-foreground">
-                    {new Date(job.deadline).toLocaleDateString()}
-                  </p>
-                </div>
-              </div>
-
-              {applied ? (
-                <div className="rounded-lg border border-green-500 bg-green-50 p-3 text-center text-green-700">
-                  ✓ Application submitted!
-                </div>
-              ) : (
-                <Button
-                  onClick={handleApply}
-                  disabled={isDeadlinePassed || applying}
-                  className="w-full"
-                >
-                  {applying ? 'Applying...' : 'Apply Now'}
-                </Button>
-              )}
-
-              {isDeadlinePassed && (
-                <p className="mt-2 text-center text-sm text-destructive">
-                  Application deadline has passed
-                </p>
-              )}
-
-              {!isAuthenticated && !applied && (
-                <p className="mt-2 text-center text-xs text-muted-foreground">
-                  Sign in to apply
-                </p>
-              )}
-            </Card>
+      <main className="min-h-screen bg-background">
+        <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
+          <div className="animate-pulse space-y-6">
+            <div className="h-10 bg-muted rounded w-1/4" />
+            <div className="h-8 bg-muted rounded w-2/3" />
+            <div className="h-6 bg-muted rounded w-1/2" />
+            <div className="space-y-2">
+              <div className="h-4 bg-muted rounded" />
+              <div className="h-4 bg-muted rounded" />
+              <div className="h-4 bg-muted rounded w-5/6" />
+            </div>
           </div>
         </div>
       </main>
-    </div>
+    )
+  }
+
+  if (error || !job) {
+    return (
+      <main className="min-h-screen bg-background">
+        <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
+          <Link href="/" className="inline-block mb-8">
+            <Button variant="ghost" size="sm">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to Jobs
+            </Button>
+          </Link>
+          <div className="rounded-lg border border-border bg-card p-8">
+            <h1 className="text-2xl font-bold text-foreground mb-4">
+              {error || 'Job not found'}
+            </h1>
+            <p className="text-muted-foreground mb-6">
+              The job listing you're looking for is no longer available.
+            </p>
+            <Link href="/">
+              <Button>Back to all jobs</Button>
+            </Link>
+          </div>
+        </div>
+      </main>
+    )
+  }
+
+  const deadlinePassed = new Date(job.deadline) < new Date()
+
+  return (
+    <main className="min-h-screen bg-background">
+      <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
+        {/* Back Button */}
+        <Link href="/" className="inline-block mb-8">
+          <Button variant="ghost" size="sm">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Jobs
+          </Button>
+        </Link>
+
+        {/* Main Card */}
+        <div className="rounded-lg border border-border bg-card p-8 mb-8">
+          {/* Header Section */}
+          <JobHeader
+            title={job.title}
+            company={job.company}
+            deadline={job.deadline}
+            applicationCount={job.applicationCount}
+          />
+
+          {/* Tech Stack */}
+          <div className="mb-8">
+            <h2 className="text-sm font-semibold text-foreground mb-4 uppercase tracking-wide">
+              Tech Stack
+            </h2>
+            <TechStack technologies={job.technologies} />
+          </div>
+
+          {/* Divider */}
+          <div className="border-t border-border my-8" />
+
+          {/* Job Description */}
+          <div className="mb-8">
+            <h2 className="text-lg font-semibold text-foreground mb-4">
+              About this role
+            </h2>
+            <div className="prose prose-sm max-w-none text-muted-foreground space-y-4">
+              {job.description.split('\n').map((paragraph, i) => (
+                <p key={i}>{paragraph}</p>
+              ))}
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className="border-t border-border my-8" />
+
+          {/* Apply Section */}
+          <div className="mt-8">
+            <ApplyButton
+              jobId={job.id}
+              deadlinePassed={deadlinePassed}
+              isLoggedIn={isLoggedIn}
+              userRole={userRole || undefined}
+            />
+          </div>
+        </div>
+      </div>
+
+      <Toaster />
+    </main>
   )
 }

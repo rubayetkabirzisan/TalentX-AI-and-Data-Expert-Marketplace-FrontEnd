@@ -4,116 +4,170 @@ import React from "react"
 
 import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import Link from 'next/link'
-import { setAuthToken } from '@/lib/api-client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Card } from '@/components/ui/card'
-import { useAuth } from '@/lib/auth-context'
+import Link from 'next/link'
+import { ArrowLeft } from 'lucide-react'
 
 export default function LoginPage() {
   const router = useRouter()
-  const { refreshUser } = useAuth()
+  const searchParams = useSearchParams()
+  const returnUrl = searchParams.get('returnUrl') || '/'
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [role, setRole] = useState<'Talent' | 'Employer'>('Talent')
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState('')
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
-    setError(null)
+    setError('')
+    setIsLoading(true)
 
     try {
-      // In a real app, this would call your backend login endpoint
-      // For now, we'll store the credentials and fetch the user
-      // Your backend should validate and return a JWT token
+      // Mock login - in production, call your auth API
+      if (!email || !password) {
+        setError('Please fill in all fields')
+        return
+      }
 
-      // Example: const response = await fetch('/api/auth/login', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ email, password })
-      // })
+      // Simulate API call
+      await new Promise((resolve) => setTimeout(resolve, 500))
 
-      // const data = await response.json()
-      // setAuthToken(data.token)
-
-      // For demo purposes, we'll just redirect
-      // In production, use the backend response token above
-      setAuthToken('demo_token_' + Date.now())
-      await refreshUser()
-
-      // Check for redirect URL
-      const redirect = new URLSearchParams(window.location.search).get(
-        'redirect'
+      // Store mock auth
+      localStorage.setItem(
+        'mockAuth',
+        JSON.stringify({
+          email,
+          role,
+          loggedInAt: new Date().toISOString(),
+        })
       )
-      router.push(redirect || '/dashboard')
+
+      // Redirect to return URL or home
+      router.push(returnUrl)
     } catch (err) {
       setError('Login failed. Please try again.')
-      console.error(err)
+      console.error('[v0] Login error:', err)
     } finally {
-      setLoading(false)
+      setIsLoading(false)
     }
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-gradient-to-br from-background via-background to-secondary px-4 py-8">
-      <Card className="w-full max-w-md p-8 shadow-lg">
-        <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold text-foreground">JobMatch</h1>
-          <p className="mt-2 text-muted-foreground">Sign in to your account</p>
-        </div>
-
-        {error && (
-          <div className="mb-4 rounded-lg border border-destructive bg-destructive/10 p-3 text-sm text-destructive">
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handleLogin} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-foreground">
-              Email
-            </label>
-            <Input
-              type="email"
-              placeholder="Enter your email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              disabled={loading}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-foreground">
-              Password
-            </label>
-            <Input
-              type="password"
-              placeholder="Enter your password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              disabled={loading}
-            />
-          </div>
-
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? 'Signing in...' : 'Sign In'}
+    <main className="min-h-screen bg-background flex items-center justify-center px-4">
+      <div className="w-full max-w-md">
+        <Link href="/" className="inline-block mb-8">
+          <Button variant="ghost" size="sm">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back
           </Button>
-        </form>
+        </Link>
 
-        <div className="mt-8 text-center text-sm">
-          <p className="text-muted-foreground">
+        <div className="rounded-lg border border-border bg-card p-8">
+          <h1 className="text-2xl font-bold text-foreground mb-2">Sign In</h1>
+          <p className="text-muted-foreground mb-8">
+            Sign in to apply for jobs or post opportunities
+          </p>
+
+          <form onSubmit={handleLogin} className="space-y-4">
+            {error && (
+              <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+                {error}
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Email
+              </label>
+              <Input
+                type="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={isLoading}
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Password
+              </label>
+              <Input
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={isLoading}
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">
+                I am a...
+              </label>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="role"
+                    value="Talent"
+                    checked={role === 'Talent'}
+                    onChange={(e) => setRole(e.target.value as 'Talent')}
+                    disabled={isLoading}
+                  />
+                  <span className="text-sm text-foreground">Job Seeker</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="role"
+                    value="Employer"
+                    checked={role === 'Employer'}
+                    onChange={(e) => setRole(e.target.value as 'Employer')}
+                    disabled={isLoading}
+                  />
+                  <span className="text-sm text-foreground">Employer</span>
+                </label>
+              </div>
+            </div>
+
+            <Button
+              type="submit"
+              size="lg"
+              className="w-full"
+              disabled={isLoading}
+            >
+              {isLoading ? 'Signing in...' : 'Sign In'}
+            </Button>
+          </form>
+
+          <p className="text-center text-sm text-muted-foreground mt-6">
             Don't have an account?{' '}
-            <Link href="/signup" className="font-medium text-primary hover:underline">
+            <Link href="/signup" className="text-primary hover:underline">
               Sign up
             </Link>
           </p>
         </div>
-      </Card>
-    </div>
+
+        {/* Demo credentials info */}
+        <div className="mt-8 rounded-lg border border-border bg-muted/50 p-4">
+          <p className="text-sm font-medium text-foreground mb-2">
+            Demo Credentials
+          </p>
+          <p className="text-xs text-muted-foreground mb-2">
+            Use any email and password to login. Select your role (Job Seeker or Employer).
+          </p>
+          <ul className="text-xs text-muted-foreground space-y-1">
+            <li>• Job Seekers can apply to positions</li>
+            <li>• Employers see a different view in job listings</li>
+          </ul>
+        </div>
+      </div>
+    </main>
   )
 }
